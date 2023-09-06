@@ -1,125 +1,143 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using Microsoft.IdentityModel.Tokens;
 
 namespace ShopifyMultipass;
 
 public sealed class ShopifyMultipass
 {
-    private readonly string _secret;
-    private readonly string _domain;
+    private readonly byte[] _encryptionKey;
+    private readonly byte[] _signatureKey;
+    private readonly string _redirectUrl;
 
+    /// <summary>
+    /// Initialise the ShopifyMultipass class with your Multipass secret and Shopify domain.
+    /// </summary>
+    /// <param name="secret">(<c>Required</c>) This can be found in the Multipass section of your Shopify Admin (once Multipass has been enabled).</param>
+    /// <param name="domain">(<c>Required</c>) This is needed for redirecting once the token has been generated.</param>
+    /// <exception cref="ArgumentNullException">Omitting either of the required constructor arguments will throw an <c>ArgumentNullException</c>. This includes for the case where an empty or whitespace string is provided for either argument.</exception>
     public ShopifyMultipass(string secret, string domain)
     {
-        if (string.IsNullOrEmpty(secret))
-            throw new ArgumentNullException(nameof(secret));
+        if (string.IsNullOrWhiteSpace(secret))
+            throw new ArgumentNullException(nameof(secret), "A Multipass secret is required. This can be found in the Multipass section of your Shopify Admin (once Multipass has been enabled).");
 
-        if (string.IsNullOrEmpty(domain))
-            throw new ArgumentNullException(nameof(domain), "Please specify the shopify domain.");
+        if (string.IsNullOrWhiteSpace(domain))
+            throw new ArgumentNullException(nameof(domain), "Please specify your Shopify domain. This is needed for redirecting once the token has been generated.");
 
-        _secret = secret;
-        _domain = domain;
-    }
-
-    public string Process(string customerJson)
-    {
-        if (string.IsNullOrEmpty(customerJson))
-            throw new ArgumentNullException("input", "Customer object cannot be null.");
-        
-        var theHash = GenerateSHA256();
-
-        var encryptionKeyArraySegment = new ArraySegment<byte>(theHash, 0, 16);
-        var signatureKeyArraySegment = new ArraySegment<byte>(theHash, 16, 16);
-
-        var encryptionKey = encryptionKeyArraySegment.ToArray();
-        var signatureKey = signatureKeyArraySegment.ToArray();
-
-        //generate random 16 bytes for Init Vactor
-        var iv = new byte[16];
-        new RNGCryptoServiceProvider().GetBytes(iv);
-
-        //Generate Cipher using AES-128-CBC algo and concat Init Vector with this.
-        var cipherData = EncryptStringToBytes(customerJson, encryptionKey, iv);
-        var cipher = Combine(iv, cipherData);
-
-        //Generate signature of Cipher
-        HMACSHA256 hasher = new HMACSHA256(signatureKey);
-        byte[] sing = hasher.ComputeHash(cipher);
-
-        //append signature to cipher and convert it to URL safe base64 string
-        var token = Convert.ToBase64String(Combine(cipher, sing)).Replace("+", "-").Replace("/", "_");
-
-        //_log.InfoFormat("Multipass token => {0}", token);
-
-        var redirectUrl = GetMultipassRedirectUrl(token);
-
-        return redirectUrl;
+        // Use the secret to generate an encryption key and a signature key.
+        var keyMaterial = SHA256.HashData(Encoding.UTF8.GetBytes(secret));
+        _encryptionKey = new ArraySegment<byte>(keyMaterial, 0, 16).ToArray();
+        _signatureKey = new ArraySegment<byte>(keyMaterial, 16, 16).ToArray();
+        _redirectUrl = $"https://{domain}/account/login/multipass/";
     }
 
     /// <summary>
-    /// Convert your data to multipass token and get redirect url for shopify mutipass
+    /// Generate a Shopify Multipass token for the provided customer JSON data.
     /// </summary>
-    /// <param name="token"></param>
-    /// <returns></returns>
-    private string GetMultipassRedirectUrl(string token)
+    /// <param name="customerJson">(<c>Required</c>) JSON representation of the customer data.</param>
+    /// <returns>A Shopify Multipass token.</returns>
+    /// <exception cref="ArgumentNullException">Omitting the required <c>customerJson</c> argument will throw an <c>ArgumentNullException</c>. This includes for the case where an empty or whitespace string is provided.</exception>
+    public string GenerateToken(string customerJson)
     {
-        //build redirect url
-        return $"https://{_domain}/account/login/multipass/{token}";
-    }
+        if (string.IsNullOrWhiteSpace(customerJson))
+            throw new ArgumentNullException(nameof(customerJson), "The provided customer JSON string is null, empty or contains only whitespaces.");
 
-    public string SendToken(string token)
-    {
-        var url = GetMultipassRedirectUrl(token);
+        // Encrypt the provided customer JSON data.
+        var cipher = Encrypt(customerJson);
 
-        var httpClient = new HttpClient();
-        var response = httpClient.GetStringAsync(url).Result;
+        // Create a signature (message authentication code) of the cipher byte array.
+        var signature = Sign(cipher);
         
-        return response;
+        // Combine and encode everything using URL-safe Base64 (RFC 4648).
+        var payload = Combine(cipher, signature);
+        var token = Base64UrlEncoder.Encode(payload)!;
+        
+        // Return the redirect URL with the token appended.
+        return _redirectUrl + token;
     }
 
-    private byte[] GenerateSHA256()
+    /// <summary>
+    /// Encrypt plaintext using AES in CBC mode with a random IV.
+    /// </summary>
+    /// <param name="plaintext">(<c>Required</c>) Input text for encryption.</param>
+    /// <returns>A byte array representing the encrypted <c>plaintext</c>.</returns>
+    private byte[] Encrypt(string plaintext)
     {
-        var theHash = SHA256.HashData(Encoding.UTF8.GetBytes(_secret));  
-        return theHash;
+        // Generate an initialization vector (IV).
+        var iv = new byte[16];
+        
+        // Use a secure PRNG to generate a random IV.
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            // Fill the array with cryptographically secure random bytes.
+            rng.GetBytes(iv);
+        }
+
+        // Encrypt the string to an array of bytes.
+        var cipherData = EncryptStringToBytes(plaintext, _encryptionKey, iv);
+        
+        // Append the encrypted cipher data to the initialization vector.
+        return Combine(iv, cipherData);
     }
-
-
-    private static byte[] EncryptStringToBytes(string plainText, byte[] key, byte[] iv)
+    
+    /// <summary>
+    /// Create a signature (message authentication code) of the cipher array of bytes using <c>HMAC-SHA256</c> with the secret key.
+    /// </summary>
+    /// <param name="cipher">An encrypted array of bytes representing the customer JSON data.</param>
+    /// <returns>A signature (message authentication code) of the <c>cipher</c></returns>
+    private byte[] Sign(byte[] cipher)
     {
-        // Check arguments.
-        if (plainText is not { Length: > 0 })
-            throw new ArgumentNullException(nameof(plainText));
+        var hasher = new HMACSHA256(_signatureKey);
+        return hasher.ComputeHash(cipher);
+    }
+    
+    /// <summary>
+    /// Encrypt the provided plaintext using AES in CBC mode with the provided key and initialisation vector (IV).
+    /// </summary>
+    /// <param name="plaintext">(<c>Required</c>) Customer data that is to be encrypted.</param>
+    /// <param name="key">(<c>Required</c>) A generated encryption key, based on the provided Shopify Multipass secret.</param>
+    /// <param name="iv">(<c>Required</c>) A generated initialization vector (IV).</param>
+    /// <returns>The provided customer data, encrypted as a byte array.</returns>
+    /// <exception cref="ArgumentNullException">An <c>ArgumentNullException</c> will be thrown if any of the method arguments are null or empty.</exception>
+    private static byte[] EncryptStringToBytes(string plaintext, byte[] key, byte[] iv)
+    {
+        // Run a few checks to ensure the provided arguments are valid.
+        if (plaintext is not { Length: > 0 })
+            throw new ArgumentNullException(nameof(plaintext));
         if (key is not { Length: > 0 })
             throw new ArgumentNullException(nameof(key));
         if (iv is not { Length: > 0 })
             throw new ArgumentNullException(nameof(iv));
         
+        // Create an AES object with the specified key and initialization vector (IV).
         using var aes = Aes.Create();
         aes.Key = key;
         aes.Mode = CipherMode.CBC;
         aes.IV = iv;
         aes.Padding = PaddingMode.PKCS7;
 
+        // Create an encryptor to perform the stream transform.
         var encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
 
+        // Create the streams used for encryption.
         using var msEncrypt = new MemoryStream();
         using var csEncrypt = new CryptoStream(msEncrypt, encryptor, CryptoStreamMode.Write);
         using (var swEncrypt = new StreamWriter(csEncrypt))
         {
-            //Write all data to the stream.
-            swEncrypt.Write(plainText);
+            // Write all data to the stream.
+            swEncrypt.Write(plaintext);
         }
 
-        var encrypted = msEncrypt.ToArray();
-
-        return encrypted;
+        // Return the encrypted bytes from the memory stream.
+        return msEncrypt.ToArray();
     }
     
     /// <summary>
-    /// for merging two bytes arrays
+    /// Combine two byte arrays into one.
     /// </summary>
-    /// <param name="a1">First array</param>
-    /// <param name="a2">Second array</param>
-    /// <returns></returns>
+    /// <param name="a1">(<c>Required</c>) The first byte array to be combined.</param>
+    /// <param name="a2">(<c>Required</c>) The second byte array to be combined.</param>
+    /// <returns>A single byte array representing a combination of the provided <c>a1</c> and <c>a2</c> byte arrays.</returns>
     private static byte[] Combine(byte[] a1, byte[] a2)
     {
         var ret = new byte[a1.Length + a2.Length];
