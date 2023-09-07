@@ -5,14 +5,17 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <PackageId>Shopify.Multipass</PackageId>
-        <Version>1.0.0-alpha</Version>
+        <Version>1.0.0-preview</Version>
         <Title>Shopify Multipass Token Generator</Title>
         <Authors>Tom Larcher</Authors>
         <Description>A Shopify Multipass token generation implementation based upon guidance provided in the official Shopify developer documentation. (https://shopify.dev/docs/api/multipass)</Description>
         <PackageIcon>shopify-icon.png</PackageIcon>
         <PackageReleaseNotes>The first release of this Shopify Multipass package containing the fundamentals of Multipass token generation.</PackageReleaseNotes>
         <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-        <PackageTags>Shopify, Multipass</PackageTags>
+        <PackageTags>Shopify Multipass</PackageTags>
+        <RepositoryType>git</RepositoryType>
+        <PackageProjectUrl>https://github.com/findyourexit/shopify-multipass-dotnet</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/findyourexit/shopify-multipass-dotnet.git</RepositoryUrl>
     </PropertyGroup>
 
     <ItemGroup>
