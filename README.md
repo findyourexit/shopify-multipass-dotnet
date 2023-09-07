@@ -1,5 +1,7 @@
 # :shopping: Shopify Multipass for .NET (7.0)
 
+![Shopify.Multipass NuGet](https://img.shields.io/nuget/v/Shopify.Multipass?style=for-the-badge&logo=nuget)
+
 Available to [Shopify Plus](https://www.shopify.com/plus) merchants, [Multipass](https://shopify.dev/docs/api/multipass) is an industry-standard mechanism for implementing [single sign-on (SSO)](https://en.wikipedia.org/wiki/Single_sign-on) between a Shopify store and a third-party service.
 
 The [Shopify Multipass](https://shopify.dev/docs/api/multipass) mechanism makes use of a secret (`string`) to generate a valid (encrypted) Multipass login token. The required secret can be procured from the Shopify admin portal (after enabling Multipass).
@@ -20,7 +22,11 @@ Install-Package Shopify.Multipass
 
 ## :hammer: Usage
 ```csharp
-// TODO
+// Instantiation. Prepares cryptographic keys for Multipass login token genetation.
+var multipass = new ShopifyMultipass.ShopifyMultipass(secret, domain);
+
+// URL generation. This generates the required Multipass login token and appends it to the provided domain.
+var url = multipass.GenerateToken(customerJson);
 ```
 
 ## :file_folder:	 References
