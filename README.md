@@ -1,6 +1,6 @@
 # :shopping: Shopify Multipass for .NET (7.0)
 
-![Shopify.Multipass NuGet](https://img.shields.io/nuget/v/Shopify.Multipass?style=for-the-badge&logo=nuget)
+[![Shopify.Multipass NuGet](https://img.shields.io/nuget/v/Shopify.Multipass?style=for-the-badge&logo=nuget)](https://www.nuget.org/packages/Shopify.Multipass/)
 
 Available to [Shopify Plus](https://www.shopify.com/plus) merchants, [Multipass](https://shopify.dev/docs/api/multipass) is an industry-standard mechanism for implementing [single sign-on (SSO)](https://en.wikipedia.org/wiki/Single_sign-on) between a Shopify store and a third-party service.
 
