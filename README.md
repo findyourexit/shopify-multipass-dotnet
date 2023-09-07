@@ -13,7 +13,7 @@ This key derivation is done through the use of the [SHA-256](https://en.wikipedi
 
 ## :package: Installation
 
-#### NuGet Package Manager Console :cog:
+#### NuGet Package Manager Console :gear:
 ```powershell
 Install-Package Shopify.Multipass
 ```

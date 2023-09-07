@@ -16,6 +16,8 @@
         <RepositoryType>git</RepositoryType>
         <PackageProjectUrl>https://github.com/findyourexit/shopify-multipass-dotnet</PackageProjectUrl>
         <RepositoryUrl>https://github.com/findyourexit/shopify-multipass-dotnet.git</RepositoryUrl>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageLicenseFile>LICENSE</PackageLicenseFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -28,6 +30,5 @@
     <ItemGroup>
       <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="6.32.3" />
     </ItemGroup>
-
-
+    
 </Project>
